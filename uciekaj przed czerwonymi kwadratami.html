@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Unikaj Kwadracików</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background-color: #f0f0f0;
+    }
+    #gameCanvas {
+      border: 2px solid black;
+      background-color: #ffffff;
+      position: relative;
+    }
+    #restartButton {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 20px;
+      background-color: #4CAF50;
+      color: white;
+      font-size: 20px;
+      border: none;
+      cursor: pointer;
+    }
+    #restartButton:hover {
+      background-color: #45a049;
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="gameCanvas" width="400" height="400"></canvas>
+<button id="restartButton" onclick="startGame()">Restart</button>
+
+<script>
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const restartButton = document.getElementById('restartButton');
+
+  const enemySpeed = 1;      // Prędkość przeciwników
+  const playerSpeed = 20;    // Jeszcze szybszy zielony kwadrat
+
+  const player = {
+    x: 50,
+    y: 50,
+    size: 20,
+    speed: playerSpeed,
+  };
+
+  const enemies = [];
+  const enemyCount = 10;
+  const enemySize = 20;
+
+  let gameOver = false;
+  let invincible = true;   // Gracz jest nieśmiertelny na początku
+  let score = 0;           // Wynik – czas przeżycia w sekundach
+  let scoreInterval;       // Referencja do interwału liczącego punkty
+
+  // Inicjalizacja przeciwników z losowym kierunkiem przy stałej prędkości enemySpeed
+  function createEnemies() {
+    for (let i = 0; i < enemyCount; i++) {
+      const angle = Math.random() * 2 * Math.PI;
+      enemies.push({
+        x: Math.random() * (canvas.width - enemySize),
+        y: Math.random() * (canvas.height - enemySize),
+        dx: enemySpeed * Math.cos(angle),
+        dy: enemySpeed * Math.sin(angle)
+      });
+    }
+  }
+
+  // Rysowanie gracza; gdy jest nieśmiertelny, kolor jest jaśniejszy
+  function drawPlayer() {
+    ctx.fillStyle = invincible ? 'lightgreen' : 'green';
+    ctx.fillRect(player.x, player.y, player.size, player.size);
+  }
+
+  // Rysowanie przeciwników
+  function drawEnemies() {
+    ctx.fillStyle = 'red';
+    for (const enemy of enemies) {
+      ctx.fillRect(enemy.x, enemy.y, enemySize, enemySize);
+    }
+  }
+
+  // Rysowanie wyniku
+  function drawScore() {
+    ctx.font = '16px Arial';
+    ctx.fillStyle = 'black';
+    ctx.fillText("Score: " + score, 10, 20);
+  }
+
+  // Ruch przeciwników z przechodzeniem przez ściany
+  function moveEnemies() {
+    for (const enemy of enemies) {
+      enemy.x += enemy.dx;
+      enemy.y += enemy.dy;
+      // Przechodzenie przez ściany
+      if (enemy.x < 0) enemy.x = canvas.width - enemySize;
+      if (enemy.x + enemySize > canvas.width) enemy.x = 0;
+      if (enemy.y < 0) enemy.y = canvas.height - enemySize;
+      if (enemy.y + enemySize > canvas.height) enemy.y = 0;
+    }
+  }
+
+  // Sprawdzanie kolizji między graczem a przeciwnikami (pomijane, gdy gracz jest nieśmiertelny)
+  function checkCollisions() {
+    if (invincible) return;
+    for (const enemy of enemies) {
+      if (
+        player.x < enemy.x + enemySize &&
+        player.x + player.size > enemy.x &&
+        player.y < enemy.y + enemySize &&
+        player.y + player.size > enemy.y
+      ) {
+        gameOver = true;
+        alert('Game Over! Your score: ' + score);
+        restartButton.style.display = 'block';
+        clearInterval(scoreInterval);
+        break;
+      }
+    }
+  }
+
+  // Główna funkcja rysująca planszę
+  function draw() {
+    if (gameOver) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawScore();
+    drawPlayer();
+    drawEnemies();
+    moveEnemies();
+    checkCollisions();
+
+    requestAnimationFrame(draw);
+  }
+
+  // Ruch gracza z przechodzeniem przez ściany
+  function movePlayer(e) {
+    if (e.key === 'ArrowUp') player.y -= player.speed;
+    if (e.key === 'ArrowDown') player.y += player.speed;
+    if (e.key === 'ArrowLeft') player.x -= player.speed;
+    if (e.key === 'ArrowRight') player.x += player.speed;
+
+    // Przechodzenie przez ściany dla gracza
+    if (player.x < 0) player.x = canvas.width - player.size;
+    if (player.x + player.size > canvas.width) player.x = 0;
+    if (player.y < 0) player.y = canvas.height - player.size;
+    if (player.y + player.size > canvas.height) player.y = 0;
+
+    // Restart gry po naciśnięciu "Enter"
+    if (e.key === 'Enter' && gameOver) startGame();
+  }
+
+  // Inicjalizacja i restart gry
+  function startGame() {
+    player.x = 50;
+    player.y = 50;
+    enemies.length = 0;
+    createEnemies();
+    gameOver = false;
+    invincible = true;
+    score = 0;
+    restartButton.style.display = 'none';
+    clearInterval(scoreInterval);
+
+    // Gracz jest nieśmiertelny przez pierwsze 3 sekundy,
+    // a punkty zaczynają się liczyć dopiero po tym czasie.
+    setTimeout(() => {
+      invincible = false;
+      scoreInterval = setInterval(() => {
+        if (!gameOver) score++;
+      }, 1000);
+    }, 3000);
+
+    draw();
+    window.addEventListener('keydown', movePlayer);
+  }
+
+  startGame();
+</script>
+
+</body>
+</html>
