@@ -47,7 +47,8 @@
   const ctx = canvas.getContext('2d');
   const restartButton = document.getElementById('restartButton');
 
-  const enemySpeed = 1;      // Prędkość przeciwników
+  const enemySpeed = 1;      // Prędkość przeciwników (startowa)
+  let difficultyInterval;    // Interwał zwiększania trudności
   const playerSpeed = 20;    // Jeszcze szybszy zielony kwadrat
 
   const player = {
@@ -64,7 +65,9 @@
   let gameOver = false;
   let invincible = true;   // Gracz jest nieśmiertelny na początku
   let score = 0;           // Wynik – czas przeżycia w sekundach
+  let highScore = Number(localStorage.getItem('highScore')) || 0;
   let scoreInterval;       // Referencja do interwału liczącego punkty
+  let paused = false;
 
   // Inicjalizacja przeciwników z losowym kierunkiem przy stałej prędkości enemySpeed
   function createEnemies() {
@@ -98,6 +101,7 @@
     ctx.font = '16px Arial';
     ctx.fillStyle = 'black';
     ctx.fillText("Score: " + score, 10, 20);
+    ctx.fillText("Highscore: " + highScore, 10, 40);
   }
 
   // Ruch przeciwników z przechodzeniem przez ściany
@@ -113,6 +117,14 @@
     }
   }
 
+  // Stopniowe zwiększanie prędkości przeciwników
+  function increaseDifficulty() {
+    for (const enemy of enemies) {
+      enemy.dx *= 1.1;
+      enemy.dy *= 1.1;
+    }
+  }
+
   // Sprawdzanie kolizji między graczem a przeciwnikami (pomijane, gdy gracz jest nieśmiertelny)
   function checkCollisions() {
     if (invincible) return;
@@ -124,9 +136,14 @@
         player.y + player.size > enemy.y
       ) {
         gameOver = true;
+        if (score > highScore) {
+          highScore = score;
+          localStorage.setItem('highScore', highScore);
+        }
         alert('Game Over! Your score: ' + score);
         restartButton.style.display = 'block';
         clearInterval(scoreInterval);
+        clearInterval(difficultyInterval);
         break;
       }
     }
@@ -137,10 +154,16 @@
     if (gameOver) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawScore();
-    drawPlayer();
-    drawEnemies();
-    moveEnemies();
-    checkCollisions();
+    if (!paused) {
+      drawPlayer();
+      drawEnemies();
+      moveEnemies();
+      checkCollisions();
+    } else {
+      ctx.font = '30px Arial';
+      ctx.fillStyle = 'black';
+      ctx.fillText('PAUSED', canvas.width / 2 - 60, canvas.height / 2);
+    }
 
     requestAnimationFrame(draw);
   }
@@ -151,6 +174,7 @@
     if (e.key === 'ArrowDown') player.y += player.speed;
     if (e.key === 'ArrowLeft') player.x -= player.speed;
     if (e.key === 'ArrowRight') player.x += player.speed;
+    if (e.key.toLowerCase() === 'p') paused = !paused;
 
     // Przechodzenie przez ściany dla gracza
     if (player.x < 0) player.x = canvas.width - player.size;
@@ -171,8 +195,10 @@
     gameOver = false;
     invincible = true;
     score = 0;
+    paused = false;
     restartButton.style.display = 'none';
     clearInterval(scoreInterval);
+    clearInterval(difficultyInterval);
 
     // Gracz jest nieśmiertelny przez pierwsze 3 sekundy,
     // a punkty zaczynają się liczyć dopiero po tym czasie.
@@ -183,8 +209,11 @@
       }, 1000);
     }, 3000);
 
-    draw();
+    difficultyInterval = setInterval(increaseDifficulty, 10000);
+
+    window.removeEventListener('keydown', movePlayer);
     window.addEventListener('keydown', movePlayer);
+    draw();
   }
 
   startGame();
